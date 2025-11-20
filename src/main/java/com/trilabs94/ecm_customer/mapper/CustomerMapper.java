@@ -1,13 +1,11 @@
 package com.trilabs94.ecm_customer.mapper;
 
-import com.trilabs94.ecm_customer.dto.AddressDto;
 import com.trilabs94.ecm_customer.dto.CustomerDto;
 import com.trilabs94.ecm_customer.entity.Customer;
 
-import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class CustomerMapper {
     public static CustomerDto mapToCustomerDto(Customer customer) {
@@ -27,10 +25,11 @@ public class CustomerMapper {
                 .build();
     }
 
-    public static List<CustomerDto> mapToListCustomerDto(List<Customer> customer) {
-        return customer.stream()
-                .map(CustomerMapper::mapToCustomerDto)
-                .toList();
+    public static Customer mapToCustomer(CustomerDto customerDto, Customer customer) {
+        customer.setEmail(customerDto.getEmail());
+        customer.setFirstname(customerDto.getFirstName());
+        customer.setLastname(customerDto.getLastName());
 
+        return customer;
     }
 }

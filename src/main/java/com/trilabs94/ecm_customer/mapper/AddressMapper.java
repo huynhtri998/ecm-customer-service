@@ -13,4 +13,12 @@ public class AddressMapper {
                 .zipCode(address.getZipCode())
                 .build();
     }
+
+    public static Address addressDtoToAddress(AddressDto addressDto, Address address){
+        address.setStreet(addressDto.getStreet());
+        address.setHouseNumber(addressDto.getHouseNumber());
+        address.setZipCode(addressDto.getZipCode());
+
+        return address;
+    }
 }

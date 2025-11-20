@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface CustomerRepository extends JpaRepository<Customer,Integer> {
+public interface CustomerRepository extends JpaRepository<Customer,Long> {
 
     @Query("select c.id from Customer c")
     Page<Long> findIds(Pageable pageable);
@@ -27,4 +27,6 @@ public interface CustomerRepository extends JpaRepository<Customer,Integer> {
             where c.id in :ids
     """)
     List<Customer> findWithAddressesByIds(@Param("ids") List<Long> ids);
+
+    boolean existsByEmail(String email);
 }

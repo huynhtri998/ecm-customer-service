@@ -8,4 +8,8 @@ import java.util.List;
 
 public interface ICustomerService {
     Page<CustomerDto> getAll(Pageable pageable);
+    CustomerDto getCustomerById(Long customerId);
+    boolean updateCustomer(CustomerDto customerDto);
+    boolean createCustomer(CustomerDto customerDto);
+    boolean deleteCustomer(Long id);
 }
