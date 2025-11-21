@@ -18,9 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +74,20 @@ public class CustomerService implements ICustomerService {
                 }
             }
 
+            Set<Long> dtoIds = customerDto.getAddress().stream()
+                    .map(AddressDto::getId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            Iterator<Address> it = customer.getAddress().iterator();
+            while (it.hasNext()) {
+                Address a = it.next();
+                if (a.getId() != null && !dtoIds.contains(a.getId())) {
+                    it.remove();
+                    a.setCustomer(null);
+                }
+            }
+
             customerRepository.save(customer);
             isUpdate = true;
         }
@@ -126,4 +138,15 @@ public class CustomerService implements ICustomerService {
         customerRepository.deleteById(id);
         return true;
     }
+
+    @Override
+    public CustomerDto getCustomerByEmail(String email) {
+        Customer customer = customerRepository.findByEmail(email).orElseThrow(
+                () -> new ResourceNotFoundException("Customer not found with email: " + email)
+        );
+
+        return CustomerMapper.mapToCustomerDto(customer);
+    }
+
+
 }

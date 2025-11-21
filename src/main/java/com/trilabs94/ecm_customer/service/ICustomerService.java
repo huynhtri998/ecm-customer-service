@@ -12,4 +12,5 @@ public interface ICustomerService {
     boolean updateCustomer(CustomerDto customerDto);
     boolean createCustomer(CustomerDto customerDto);
     boolean deleteCustomer(Long id);
+    CustomerDto getCustomerByEmail(String email);
 }

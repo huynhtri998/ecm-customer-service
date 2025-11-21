@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer,Long> {
@@ -29,4 +30,6 @@ public interface CustomerRepository extends JpaRepository<Customer,Long> {
     List<Customer> findWithAddressesByIds(@Param("ids") List<Long> ids);
 
     boolean existsByEmail(String email);
+
+    Optional<Customer> findByEmail(String email);
 }
