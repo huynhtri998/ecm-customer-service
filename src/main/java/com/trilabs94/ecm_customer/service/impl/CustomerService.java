@@ -1,11 +1,11 @@
 package com.trilabs94.ecm_customer.service.impl;
 
+import com.trilabs94.common_error_handler.exception.CustomerAlreadyExistsException;
+import com.trilabs94.common_error_handler.exception.ResourceNotFoundException;
 import com.trilabs94.ecm_customer.dto.AddressDto;
 import com.trilabs94.ecm_customer.dto.CustomerDto;
 import com.trilabs94.ecm_customer.entity.Address;
 import com.trilabs94.ecm_customer.entity.Customer;
-import com.trilabs94.ecm_customer.exception.CustomerAlreadyExistsException;
-import com.trilabs94.ecm_customer.exception.ResourceNotFoundException;
 import com.trilabs94.ecm_customer.mapper.AddressMapper;
 import com.trilabs94.ecm_customer.mapper.CustomerMapper;
 import com.trilabs94.ecm_customer.repository.CustomerRepository;
