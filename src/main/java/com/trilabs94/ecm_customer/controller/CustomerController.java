@@ -1,201 +1,165 @@
 package com.trilabs94.ecm_customer.controller;
 
-import com.trilabs94.ecm_customer.dto.CustomerDto;
-import com.trilabs94.ecm_customer.dto.ErrorResponseDto;
-import com.trilabs94.ecm_customer.dto.PageResponse;
+import com.trilabs94.ecm_customer.dto.CustomerRequestDto;
+import com.trilabs94.ecm_customer.dto.CustomerResponseDto;
+import com.trilabs94.ecm_customer.dto.CustomerSummaryDto;
 import com.trilabs94.ecm_customer.service.ICustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-@Tag(
-        name = "CRUD REST APIs for Customers",
-        description = "CRUD REST APIs to CREATE, UPDATE, FETCH AND DELETE customer details"
-)
+import java.net.URI;
+
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/customers")
 @RequiredArgsConstructor
 @Validated
+@Schema(
+        name = "Customer Controller",
+        description = "REST APIs for managing customers in the Ecommerce Customer Management System"
+)
 public class CustomerController {
+
     private final ICustomerService customerService;
 
-
     @Operation(
-            summary = "Get All Customers REST API",
-            description = "REST API to get all customers with pagination"
+            summary = "Create a new customer",
+            description = "Create a new customer with basic information and optional addresses."
     )
     @ApiResponses(value = {
             @ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved list of customers"
+                    responseCode = "201",
+                    description = "Customer created",
+                    content = @Content(schema = @Schema(implementation = CustomerResponseDto.class))
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Bad Request",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
+                    description = "Validation error",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Customer with given email already exists",
+                    content = @Content
             )
     })
-    @GetMapping("/users")
-    public ResponseEntity<PageResponse<CustomerDto>> getAll(Pageable pageable){
-        Page<CustomerDto> customers = customerService.getAll(pageable);
-        return ResponseEntity.ok().body(PageResponse.of(customers));
+    @PostMapping
+    public ResponseEntity<CustomerResponseDto> createCustomer(
+            @Valid @RequestBody CustomerRequestDto requestDto
+    ) {
+        CustomerResponseDto created = customerService.createCustomer(requestDto);
+
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(created.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(
-            summary = "Get Customer By ID REST API",
-            description = "REST API to get customer by ID"
+            summary = "Update an existing customer",
+            description = "Update customer information and replace its addresses with the given list."
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Successfully retrieved customer by ID"
+                    description = "Customer updated",
+                    content = @Content(schema = @Schema(implementation = CustomerResponseDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Validation error",
+                    content = @Content
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "Customer not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Customer with given email already exists",
+                    content = @Content
             )
     })
-    @GetMapping("/users/{id}")
-    public ResponseEntity<CustomerDto> getCustomerById(@PathVariable(name = "id") @Positive Long customerId){
-        CustomerDto customerDto = customerService.getCustomerById(customerId);
-        return ResponseEntity.ok().body(customerDto);
+    @PutMapping("/{id}")
+    public ResponseEntity<CustomerResponseDto> updateCustomer(
+            @PathVariable Long id,
+            @Valid @RequestBody CustomerRequestDto requestDto
+    ) {
+        CustomerResponseDto updated = customerService.updateCustomer(id, requestDto);
+        return ResponseEntity.ok(updated);
     }
 
     @Operation(
-            summary = "Search Customer By Email REST API",
-            description = "REST API to search customer by email"
+            summary = "Get customer by ID",
+            description = "Retrieve full customer details by ID, including addresses."
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Successfully retrieved customer by email"
+                    description = "Customer found",
+                    content = @Content(schema = @Schema(implementation = CustomerResponseDto.class))
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "Customer not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
+                    content = @Content
             )
     })
-    @PostMapping("/users/search")
-    public ResponseEntity<CustomerDto> searchCustomerByEmail(@Valid @RequestBody CustomerDto customerDto){
-        customerDto = customerService.getCustomerByEmail(customerDto.getEmail());
-        if (customerDto != null) {
-            return ResponseEntity.ok().body(customerDto);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    @GetMapping("/{id}")
+    public ResponseEntity<CustomerResponseDto> getCustomerById(@PathVariable Long id) {
+        CustomerResponseDto dto = customerService.getCustomerById(id);
+        return ResponseEntity.ok(dto);
     }
 
     @Operation(
-            summary = "Update Customer REST API",
-            description = "REST API to update existing customer details"
+            summary = "Get customers (paged)",
+            description = "Retrieve a paginated list of customers (summary view)."
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Successfully updated customer details"
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Customer not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "Internal Server Error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
+                    description = "Customers page",
+                    content = @Content(schema = @Schema(implementation = CustomerSummaryDto.class))
             )
     })
-    @PutMapping("/users")
-    public ResponseEntity<CustomerDto> updateCustomer(@Valid @RequestBody CustomerDto customerDto){
-        boolean isUpdated = customerService.updateCustomer(customerDto);
-        if(isUpdated){
-            return ResponseEntity.ok().body(customerDto);
-        }else {
-            return ResponseEntity.notFound().build();
-        }
+    @GetMapping
+    public ResponseEntity<Page<CustomerSummaryDto>> getCustomers(Pageable pageable) {
+        Page<CustomerSummaryDto> page = customerService.getCustomers(pageable);
+        return ResponseEntity.ok(page);
     }
 
     @Operation(
-            summary = "Create Customer REST API",
-            description = "REST API to create a new customer"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully created new customer"
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "Internal Server Error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
-            )
-    })
-    @PostMapping("/users")
-    public ResponseEntity<CustomerDto> createCustomer(@Valid @RequestBody CustomerDto customerDto){
-        boolean isUpdated = customerService.createCustomer(customerDto);
-        if(isUpdated){
-            return ResponseEntity.ok().body(customerDto);
-        }else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    @Operation(
-            summary = "Delete Customer REST API",
-            description = "REST API to delete a customer by ID"
+            summary = "Delete customer",
+            description = "Delete an existing customer by ID."
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "204",
-                    description = "Successfully deleted customer"
+                    description = "Customer deleted",
+                    content = @Content
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "Customer not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "Internal Server Error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
+                    content = @Content
             )
     })
-    @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteCustomer(@PathVariable("id") @Positive Long id) {
-        boolean isDeleted = customerService.deleteCustomer(id);
-        if (isDeleted) {
-            return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
+        customerService.deleteCustomer(id);
+        return ResponseEntity.noContent().build();
     }
 }

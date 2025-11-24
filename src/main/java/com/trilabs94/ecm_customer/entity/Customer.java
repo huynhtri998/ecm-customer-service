@@ -1,31 +1,47 @@
 package com.trilabs94.ecm_customer.entity;
 
-import com.trilabs94.ecm_customer.dto.AddressDto;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Data
 @Table(name = "customers")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = "addresses")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Customer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
+    @Column(name = "firstname", nullable = false)
     private String firstname;
 
+    @Column(name = "lastname", nullable = false)
     private String lastname;
 
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    private LocalDate createdAt;
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Address> address = new ArrayList<>();
-
+    @OneToMany(
+            mappedBy = "customer",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    private List<Address> addresses = new ArrayList<>();
 }

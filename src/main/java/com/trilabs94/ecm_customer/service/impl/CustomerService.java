@@ -1,9 +1,11 @@
 package com.trilabs94.ecm_customer.service.impl;
 
-import com.trilabs94.common_error_handler.exception.CustomerAlreadyExistsException;
+import com.trilabs94.common_error_handler.exception.ResourceAlreadyExistsException;
 import com.trilabs94.common_error_handler.exception.ResourceNotFoundException;
-import com.trilabs94.ecm_customer.dto.AddressDto;
-import com.trilabs94.ecm_customer.dto.CustomerDto;
+import com.trilabs94.ecm_customer.dto.AddressRequestDto;
+import com.trilabs94.ecm_customer.dto.CustomerRequestDto;
+import com.trilabs94.ecm_customer.dto.CustomerResponseDto;
+import com.trilabs94.ecm_customer.dto.CustomerSummaryDto;
 import com.trilabs94.ecm_customer.entity.Address;
 import com.trilabs94.ecm_customer.entity.Customer;
 import com.trilabs94.ecm_customer.mapper.AddressMapper;
@@ -11,142 +13,132 @@ import com.trilabs94.ecm_customer.mapper.CustomerMapper;
 import com.trilabs94.ecm_customer.repository.CustomerRepository;
 import com.trilabs94.ecm_customer.service.ICustomerService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CustomerService implements ICustomerService {
     private final CustomerRepository customerRepository;
+    private final CustomerMapper customerMapper;
+    private final AddressMapper addressMapper;
 
     @Override
     @Transactional
-    public Page<CustomerDto> getAll(Pageable pageable){
-        Page<Long> ids = customerRepository.findIds(pageable);
-        List<CustomerDto> dtos = customerRepository.findWithAddressesByIds(ids.getContent())
-                                                    .stream()
-                                                    .map(CustomerMapper::mapToCustomerDto)
-                                                    .toList();
-        return new PageImpl<>(dtos, pageable, ids.getTotalElements());
-    }
+    public CustomerResponseDto createCustomer(CustomerRequestDto requestDto) {
+        log.info("Creating new customer with email={}", requestDto.getEmail());
 
-    @Override
-    @Transactional
-    public CustomerDto getCustomerById(Long customerId) {
-        Customer customer = customerRepository.findById(customerId).orElseThrow(
-                () -> new ResourceNotFoundException("Customer not found with id: " + customerId)
-        );
-
-        return CustomerMapper.mapToCustomerDto(customer);
-    }
-
-    @Override
-    @Transactional
-    public boolean updateCustomer(CustomerDto customerDto) {
-        boolean isUpdate = false;
-        if (customerDto != null) {
-            Customer customer = customerRepository.findById(customerDto.getId()).orElseThrow(
-                    () -> new ResourceNotFoundException("Customer not found with id: " + customerDto.getId())
+        if (customerRepository.existsByEmailIgnoreCase(requestDto.getEmail())) {
+            throw new ResourceAlreadyExistsException(
+                    "Customer with email '%s' already exists".formatted(requestDto.getEmail())
             );
-
-            CustomerMapper.mapToCustomer(customerDto, customer);
-            Map<Long, Address> addressMap = customer.getAddress()
-                    .stream()
-                    .collect(java.util.stream.Collectors.toMap(Address::getId, address -> address));
-
-            for (AddressDto addressValue : customerDto.getAddress()) {
-                if(addressValue.getId() != null){
-                    Address address = addressMap.get(addressValue.getId());
-                    if(address != null){
-                        AddressMapper.addressDtoToAddress(addressValue, address);
-                    }
-                }else {
-                    Address newAddress = new Address();
-                    AddressMapper.addressDtoToAddress(addressValue, newAddress);
-                    newAddress.setCustomer(customer);
-                    customer.getAddress().add(newAddress);
-                }
-            }
-
-            Set<Long> dtoIds = customerDto.getAddress().stream()
-                    .map(AddressDto::getId)
-                    .filter(java.util.Objects::nonNull)
-                    .collect(java.util.stream.Collectors.toSet());
-
-            Iterator<Address> it = customer.getAddress().iterator();
-            while (it.hasNext()) {
-                Address a = it.next();
-                if (a.getId() != null && !dtoIds.contains(a.getId())) {
-                    it.remove();
-                    a.setCustomer(null);
-                }
-            }
-
-            customerRepository.save(customer);
-            isUpdate = true;
         }
 
-        return isUpdate;
-    }
+        Customer customer = customerMapper.toEntity(requestDto);
 
-
-    @Override
-    @Transactional
-    public boolean createCustomer(CustomerDto customerDto) {
-        if (customerRepository.existsByEmail((customerDto.getEmail()))) {
-            throw new CustomerAlreadyExistsException("Customer already exists with email: " + customerDto.getEmail());
-        }
-
-        Customer customer = CustomerMapper.mapToCustomer(customerDto, new Customer());
-        customer.setCreatedAt(LocalDate.now());
-        if (customerDto.getAddress() != null) {
-            for (AddressDto addressDto : customerDto.getAddress()) {
-                Address address = new Address();
-                AddressMapper.addressDtoToAddress(addressDto, address);
-                address.setCustomer(customer);
-                customer.getAddress().add(address);
-            }
-        }
+        replaceAddresses(customer, requestDto.getAddresses());
 
         Customer saved = customerRepository.save(customer);
-        if (saved.getId() != null) {
-            customerDto.setId(saved.getId());
-            if (saved.getAddress() != null) {
-                for (int i = 0; i < saved.getAddress().size(); i++) {
-                    Address address = saved.getAddress().get(i);
-                    customerDto.getAddress().get(i).setId(address.getId());
-                }
-            }
-            return true;
-        }
-        return false;
+        return customerMapper.toResponseDto(saved);
     }
-
 
     @Override
     @Transactional
-    public boolean deleteCustomer(Long id) {
-        if (!customerRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Customer not found with id: " + id);
+    public CustomerResponseDto updateCustomer(Long id, CustomerRequestDto requestDto) {
+        log.info("Updating customer id={}", id);
+
+        Customer existing = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer with id %d not found".formatted(id)
+                ));
+
+        if (customerRepository.existsByEmailIgnoreCaseAndIdNot(requestDto.getEmail(), id)) {
+            throw new ResourceAlreadyExistsException(
+                    "Customer with email '%s' already exists".formatted(requestDto.getEmail())
+            );
         }
-        customerRepository.deleteById(id);
-        return true;
+
+        customerMapper.updateEntity(existing, requestDto);
+
+        replaceAddresses(existing, requestDto.getAddresses());
+
+        Customer saved = customerRepository.save(existing);
+        return customerMapper.toResponseDto(saved);
     }
 
     @Override
-    public CustomerDto getCustomerByEmail(String email) {
-        Customer customer = customerRepository.findByEmail(email).orElseThrow(
-                () -> new ResourceNotFoundException("Customer not found with email: " + email)
-        );
+    public CustomerResponseDto getCustomerById(Long id) {
+        log.info("Fetching customer id={}", id);
 
-        return CustomerMapper.mapToCustomerDto(customer);
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer with id %d not found".formatted(id)
+                ));
+
+        return customerMapper.toResponseDto(customer);
+    }
+
+    @Override
+    public Page<CustomerSummaryDto> getCustomers(Pageable pageable) {
+        log.info("Fetching customers with pageable={}", pageable);
+
+        Page<Customer> page = customerRepository.findAll(pageable);
+        return page.map(customerMapper::toSummaryDto);
+    }
+
+    @Override
+    @Transactional
+    public void deleteCustomer(Long id) {
+        log.info("Deleting customer id={}", id);
+
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer with id %d not found".formatted(id)
+                ));
+
+        customerRepository.delete(customer);
     }
 
 
+    private void replaceAddresses(Customer customer, List<AddressRequestDto> addressDtos) {
+        List<Address> currentAddresses = customer.getAddresses();
+
+        if (addressDtos == null || addressDtos.isEmpty()) {
+            currentAddresses.clear();
+            return;
+        }
+
+        Map<Long, Address> existingById = currentAddresses.stream()
+                .collect(Collectors.toMap(Address::getId, a -> a));
+
+        List<Address> finalAddresses = new ArrayList<>();
+
+        for (AddressRequestDto dto : addressDtos) {
+            if (dto.getId() != null) {
+                Address existing = existingById.remove(dto.getId());
+                if (existing != null) {
+                    addressMapper.updateEntity(existing, dto);
+                    finalAddresses.add(existing);
+                } else {
+                    throw new IllegalArgumentException("Address id=" + dto.getId() + " does not belong to customer");
+                }
+            } else {
+                Address created = addressMapper.toEntity(dto, customer);
+                finalAddresses.add(created);
+            }
+        }
+
+        currentAddresses.clear();
+        currentAddresses.addAll(finalAddresses);
+    }
 }
